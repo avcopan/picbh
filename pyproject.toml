@@ -2,7 +2,11 @@
 name = "picbh"
 version = "0.0.0"
 authors = [{name = "Andreas V. Copan", email = "avcopan@uga.edu"}]
-dependencies = []
+dependencies = [
+    "networkx>=3.3",
+    "pydantic>=2.5",
+    "rdkit>=2025",
+]
 requires-python = ">= 3.13"
 
 [build-system]
@@ -20,6 +24,7 @@ exclude = [
 select = ["ALL"]
 ignore = [
     "COM812",   # missing trailing comma (handled by format)
+    "RUF022",   # `__all__` is not sorted (kept in a hand-ordered form)
     "TID252",   # relative import
     "D203",     # conflict: incorrect blank line before class (uses D211 instead)
     "D213",     # conflict: multi-line summary second line (uses D212 instead)
@@ -50,8 +55,9 @@ root_package = "picbh"
 name = "Module Layering"
 type = "layers"
 layers = [
-    "picbh.layer2",
-    "picbh.layer1",
+    "picbh.graph.mol",
+    "picbh.graph.base",
+    "picbh.element",
 ]
 
 # Pytest configurations
