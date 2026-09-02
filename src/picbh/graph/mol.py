@@ -11,6 +11,7 @@ Bonds are Kekulized on input, so :attr:`Bond.order` is always an integer (1, 2,
 or 3); RDKit re-perceives aromaticity on output.
 """
 
+import enum
 from collections.abc import Mapping, Sequence
 
 from rdkit import Chem
@@ -53,6 +54,12 @@ def _add_atom_numbers(mol: Mol, to_number: Mapping[int, int]) -> Mol:
 class Atom(Node):
     """Represents an atom in a molecule."""
 
+    class Field(enum.StrEnum):
+        """Field names of :class:`Atom`, for use as graph attribute keys."""
+
+        symbol = "symbol"
+        implicit_hydrogens = "implicit_hydrogens"
+
     symbol: str
     implicit_hydrogens: int = 0
 
@@ -77,6 +84,11 @@ _BOND_TYPE_FROM_ORDER = {
 
 class Bond(Edge):
     """Represents a bond between two atoms in a molecule."""
+
+    class Field(enum.StrEnum):
+        """Field names of :class:`Bond`, for use as graph attribute keys."""
+
+        order = "order"
 
     order: int = 1
 
@@ -108,7 +120,7 @@ def symbols(gra: MolGraph, keys: Sequence[int] | None = None) -> list[str]:
         The atomic symbols.
     """
     keys = node_keys(gra) if keys is None else keys
-    return [gra.nodes[key][Atom.symbol] for key in keys]
+    return [gra.nodes[key][Atom.Field.symbol] for key in keys]
 
 
 def element_bonding_capacities(
@@ -156,8 +168,8 @@ def total_valences(gra: MolGraph, keys: Sequence[int] | None = None) -> list[int
     """
     keys = node_keys(gra) if keys is None else keys
     return [
-        sum(order for *_, order in gra.edges(key, data=Bond.order))
-        + gra.nodes[key][Atom.implicit_hydrogens]
+        sum(order for *_, order in gra.edges(key, data=Bond.Field.order))
+        + gra.nodes[key][Atom.Field.implicit_hydrogens]
         for key in keys
     ]
 
