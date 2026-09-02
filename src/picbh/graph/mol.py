@@ -19,7 +19,7 @@ from rdkit.Chem import rdchem
 from rdkit.Chem.rdchem import Mol, RWMol
 
 from ..element import bonding_capacity
-from .base import Edge, Graph, Node, node_keys
+from .base import Edge, Graph, Node, edge_keys, node_keys
 
 
 # RDKit helpers (inlined to avoid an extra dependency)
@@ -121,6 +121,22 @@ def symbols(gra: MolGraph, keys: Sequence[int] | None = None) -> list[str]:
     """
     keys = node_keys(gra) if keys is None else keys
     return [gra.nodes[key][Atom.Field.symbol] for key in keys]
+
+
+def bond_orders(
+    gra: MolGraph, keys: Sequence[tuple[int, int]] | None = None
+) -> list[int]:
+    """Get the bond orders of bonds.
+
+    Args:
+        gra: A molecular graph.
+        keys: The bond keys to get orders for; if ``None``, get all of them.
+
+    Returns:
+        The bond orders.
+    """
+    keys = edge_keys(gra) if keys is None else keys
+    return [gra.edges[key][Bond.Field.order] for key in keys]
 
 
 def element_bonding_capacities(

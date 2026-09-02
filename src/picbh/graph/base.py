@@ -100,6 +100,20 @@ def node_keys[NodeT: Node, EdgeT: Edge](gra: Graph[NodeT, EdgeT]) -> list[int]:
     return list(gra.nodes())
 
 
+def edge_keys[NodeT: Node, EdgeT: Edge](
+    gra: Graph[NodeT, EdgeT],
+) -> list[tuple[int, int]]:
+    """Get the list of edge keys.
+
+    Args:
+        gra: A graph.
+
+    Returns:
+        The edge keys.
+    """
+    return list(gra.edges())
+
+
 # Transformations
 def remove_edges[NodeT: Node, EdgeT: Edge](
     gra: Graph[NodeT, EdgeT],
