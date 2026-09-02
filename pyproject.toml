@@ -14,12 +14,6 @@ build-backend = "uv_build"
 requires = ["uv_build"]
 
 # Ruff configurations
-[tool.ruff]
-exclude = [
-    "docs",
-    "**/*.ipynb",
-]
-
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
