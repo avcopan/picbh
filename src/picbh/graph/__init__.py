@@ -25,10 +25,12 @@ from .mol import (
     from_rdkit_mol,
     from_smiles,
     inchi,
-    open_valences,
     rdkit_mol,
     rdkit_mol_with_index_map,
+    smiles,
     symbols,
+    total_valences,
+    unpaired_electrons,
 )
 
 __all__ = [
@@ -50,9 +52,11 @@ __all__ = [
     "isomorphism",
     "isomorphisms",
     "node_keys",
-    "open_valences",
     "rdkit_mol",
     "rdkit_mol_with_index_map",
     "remove_edges",
+    "smiles",
     "symbols",
+    "total_valences",
+    "unpaired_electrons",
 ]

@@ -22,19 +22,16 @@ def test__inchi() -> None:
 
 def test__remove_edges() -> None:
     """Test graph remove edges."""
-    water_smiles = "O"
-    oh_h_smiles = "[OH].[H]"
-    water = graph.from_smiles(water_smiles)
-    oh_h_ref = graph.from_smiles(oh_h_smiles)
-    oh_h = graph.remove_edges(water, [(0, 1)])
-    assert graph.is_isomorphic(oh_h, oh_h_ref)
+    methanol = graph.from_smiles("CO")
+    ch3_oh_ref = graph.from_smiles("[CH3].[OH]")
+    ch3_oh = graph.remove_edges(methanol, [(0, 1)])
+    assert graph.is_isomorphic(ch3_oh, ch3_oh_ref)
 
 
 def test__symbols() -> None:
     """Test graph symbols."""
-    water_smiles = "O"
-    water = graph.from_smiles(water_smiles)
-    assert graph.symbols(water) == ["O", "H", "H"]
+    water = graph.from_smiles("O")
+    assert graph.symbols(water) == ["O"]
 
 
 @pytest.mark.parametrize(
@@ -42,14 +39,45 @@ def test__symbols() -> None:
     [
         ("[H]", [1]),
         ("[He]", [0]),
-        ("O", [0, 0, 0]),
-        ("[OH]", [1, 0]),
-        ("C=C", [1, 1, 0, 0, 0, 0]),
-        ("C#C", [2, 2, 0, 0]),
-        ("O[O]", [0, 1, 0]),
+        ("O", [0]),
+        ("[OH]", [1]),
+        ("[CH2]", [2]),
+        ("C=C", [0, 0]),
+        ("C#C", [0, 0]),
+        ("O[O]", [0, 1]),
     ],
 )
-def test__open_valences(smi: str, ref: list[int]) -> None:
-    """Test graph open valences."""
+def test__unpaired_electrons(smi: str, ref: list[int]) -> None:
+    """Test graph unpaired electrons."""
     gra = graph.from_smiles(smi)
-    assert graph.open_valences(gra) == ref
+    assert graph.unpaired_electrons(gra) == ref
+
+
+@pytest.mark.parametrize(
+    "smi",
+    [
+        "O",
+        "[H]",
+        "[H][H]",
+        "[CH2]",
+        "C=C",
+        "C#C",
+        "O[O]",
+        "[OH]",
+        "c1ccccc1",
+        "c1ccc2ccccc2c1",
+        "c1cc[nH]c1",
+        "CC(=O)O",
+        "FC(F)(F)F",
+        "C1CC1",
+        "N",
+        "CN",
+    ],
+)
+def test__smiles_roundtrip(smi: str) -> None:
+    """Test SMILES <-> graph round trip.
+
+    An unmodified graph converts back to the exact SMILES it was read from.
+    """
+    gra = graph.from_smiles(smi)
+    assert graph.smiles(gra) == smi

@@ -2,7 +2,13 @@
 
 Builds a chemistry layer on top of the generic :mod:`picbh.graph.base` engine:
 atoms as nodes, bonds as edges, and conversions to and from RDKit / SMILES /
-InChI. Bond order information is excluded by design.
+InChI.
+
+Hydrogens are implicit by default: only hydrogens written as standalone ``[H]``
+atoms in a SMILES string become nodes; hydrogens folded into a heavy atom (or a
+bracket atom such as ``[CH2]``) are stored as :attr:`Atom.implicit_hydrogens`.
+Bonds are Kekulized on input, so :attr:`Bond.order` is always an integer (1, 2,
+or 3); RDKit re-perceives aromaticity on output.
 """
 
 from collections.abc import Mapping, Sequence
@@ -17,13 +23,17 @@ from .base import Edge, Graph, Node, node_keys
 
 # RDKit helpers (inlined to avoid an extra dependency)
 def _mol_from_smiles(smi: str) -> Mol:
-    """Get an RDKit molecule with explicit hydrogens from a SMILES string."""
-    return Chem.AddHs(Chem.MolFromSmiles(smi))
+    """Get a Kekulized RDKit molecule with implicit hydrogens from a SMILES string."""
+    mol = Chem.MolFromSmiles(smi)
+    Chem.Kekulize(mol, clearAromaticFlags=True)
+    return mol
 
 
 def _mol_from_inchi(chi: str) -> Mol:
-    """Get an RDKit molecule with explicit hydrogens from an InChI string."""
-    return Chem.AddHs(Chem.MolFromInchi(chi, sanitize=False, removeHs=False))
+    """Get a Kekulized RDKit molecule with implicit hydrogens from an InChI string."""
+    mol = Chem.MolFromInchi(chi)
+    Chem.Kekulize(mol, clearAromaticFlags=True)
+    return mol
 
 
 def _mol_to_inchi(mol: Mol) -> str:
@@ -44,6 +54,7 @@ class Atom(Node):
     """Represents an atom in a molecule."""
 
     symbol: str
+    implicit_hydrogens: int = 0
 
     def to_rdkit_atom(self) -> rdchem.Atom:
         """Convert to an RDKit Atom.
@@ -53,11 +64,21 @@ class Atom(Node):
         """
         rd_atom = rdchem.Atom(self.symbol)
         rd_atom.SetNoImplicit(True)  # noqa: FBT003
+        rd_atom.SetNumExplicitHs(self.implicit_hydrogens)
         return rd_atom
+
+
+_BOND_TYPE_FROM_ORDER = {
+    1: rdchem.BondType.SINGLE,
+    2: rdchem.BondType.DOUBLE,
+    3: rdchem.BondType.TRIPLE,
+}
 
 
 class Bond(Edge):
     """Represents a bond between two atoms in a molecule."""
+
+    order: int = 1
 
     def to_rdkit_bond_type(self) -> rdchem.BondType:
         """Convert to an RDKit Bond Type.
@@ -65,7 +86,7 @@ class Bond(Edge):
         Returns:
             The RDKit bond type.
         """
-        return rdchem.BondType.SINGLE
+        return _BOND_TYPE_FROM_ORDER[self.order]
 
 
 class MolGraph(Graph[Atom, Bond]):
@@ -119,22 +140,44 @@ def degrees(gra: MolGraph, keys: Sequence[int] | None = None) -> list[int]:
     return [gra.degree[key] for key in keys]
 
 
-def open_valences(gra: MolGraph, keys: Sequence[int] | None = None) -> list[int]:
-    """Get the open valences of atoms.
+def total_valences(gra: MolGraph, keys: Sequence[int] | None = None) -> list[int]:
+    """Get the total valence of each atom.
 
-    This is the bonding capacity minus the degree, i.e. the number of additional
-    bonds that could be formed.
+    This is the sum of incident bond orders plus the number of implicit
+    hydrogens, i.e. the number of bonds the atom participates in counting
+    multiplicity (RDKit's ``Atom.GetTotalValence``).
 
     Args:
         gra: A molecular graph.
         keys: The atom keys to consider; if ``None``, consider all of them.
 
     Returns:
-        The open valences.
+        The total valences.
+    """
+    keys = node_keys(gra) if keys is None else keys
+    return [
+        sum(order for *_, order in gra.edges(key, data=Bond.order))
+        + gra.nodes[key][Atom.implicit_hydrogens]
+        for key in keys
+    ]
+
+
+def unpaired_electrons(gra: MolGraph, keys: Sequence[int] | None = None) -> list[int]:
+    """Get the number of unpaired electrons on each atom.
+
+    This is the bonding capacity minus the total valence. For a neutral species
+    it is the radical count.
+
+    Args:
+        gra: A molecular graph.
+        keys: The atom keys to consider; if ``None``, consider all of them.
+
+    Returns:
+        The unpaired electron counts.
     """
     caps = element_bonding_capacities(gra, keys)
-    degs = degrees(gra, keys)
-    return [cap - deg for cap, deg in zip(caps, degs, strict=True)]
+    vals = total_valences(gra, keys)
+    return [cap - val for cap, val in zip(caps, vals, strict=True)]
 
 
 # Conversions from other types
@@ -174,11 +217,14 @@ def from_rdkit_mol(mol: Mol) -> MolGraph:
     gra = MolGraph()
 
     for rd_atom in mol.GetAtoms():
-        atom = Atom(symbol=rd_atom.GetSymbol())
+        atom = Atom(
+            symbol=rd_atom.GetSymbol(),
+            implicit_hydrogens=rd_atom.GetTotalNumHs(),
+        )
         gra.add_node(rd_atom.GetIdx(), **atom.model_dump())
 
     for rd_bond in mol.GetBonds():
-        bond = Bond()
+        bond = Bond(order=int(rd_bond.GetBondTypeAsDouble()))
         gra.add_edge(
             rd_bond.GetBeginAtomIdx(), rd_bond.GetEndAtomIdx(), **bond.model_dump()
         )
@@ -187,6 +233,23 @@ def from_rdkit_mol(mol: Mol) -> MolGraph:
 
 
 # Conversions to other types
+def smiles(gra: MolGraph) -> str:
+    """Get a SMILES string from a molecular graph.
+
+    The output is not canonicalized: atoms are written in graph-key order,
+    rooted at the lowest key, so the SMILES tracks the graph it came from.
+
+    Args:
+        gra: A molecular graph.
+
+    Returns:
+        The SMILES string.
+    """
+    mol = rdkit_mol(gra)
+    root = 0 if mol.GetNumAtoms() else -1
+    return Chem.MolToSmiles(mol, canonical=False, rootedAtAtom=root)
+
+
 def inchi(gra: MolGraph) -> str:
     """Get an InChI string from a molecular graph.
 
@@ -242,5 +305,8 @@ def rdkit_mol_with_index_map[NodeT: Atom, EdgeT: Bond](
         bond = gra.edge_type.model_validate(gra.edges[key1, key2])
         rw_mol.AddBond(to_idx[key1], to_idx[key2], order=bond.to_rdkit_bond_type())
 
+    mol = rw_mol.GetMol()
+    Chem.SanitizeMol(mol)
+
     to_key = dict(map(reversed, to_idx.items()))
-    return rw_mol.GetMol(), to_key
+    return mol, to_key
