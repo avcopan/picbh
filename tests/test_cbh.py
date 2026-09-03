@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 import pytest
 
 from picbh import cbh, graph
+from picbh.cbh import primary_fragments
 from picbh.graph import Atom
 
 # Methionine, the worked example of Scheme 1 in the CBH automation paper
@@ -66,6 +67,14 @@ def test__expansion__methionine(rung: int) -> None:
     """CBH(0-4) for methionine reproduces Scheme 1 of the CBH automation paper."""
     gra = graph.from_smiles(METHIONINE)
     assert cbh.expansion(gra, rung=rung) == _by_inchi(SCHEME_1[rung])
+
+
+@pytest.mark.parametrize("rung", [2, 3, 4])
+def test__primary_fragments_are_maximal(rung: int) -> None:
+    """No primary fragment is contained in another; a contained one's terms cancel."""
+    gra = graph.from_smiles("CC(C)(C)CC(N)CO")
+    fragments = primary_fragments(gra, rung=rung)
+    assert not any(f < g for f in fragments for g in fragments)
 
 
 @pytest.mark.parametrize("rung", [0, 1, 2, 3, 4])

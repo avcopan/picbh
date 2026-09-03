@@ -30,7 +30,7 @@ def expansion(gra: MolGraph, *, rung: int) -> dict[str, int]:
         coefficients are reactants, and the target species itself is not included.
         Terms that cancel to zero are omitted.
     """
-    fragments = _primary_fragments(gra, rung=rung)
+    fragments = primary_fragments(gra, rung=rung)
     coeffs: dict[str, int] = defaultdict(int)
     for simplex in _nerve(gra, fragments):
         nodes = frozenset.intersection(*(fragments[i] for i in simplex))
@@ -40,21 +40,30 @@ def expansion(gra: MolGraph, *, rung: int) -> dict[str, int]:
     return {frag: coeff for frag, coeff in coeffs.items() if coeff}
 
 
-def _primary_fragments(gra: MolGraph, *, rung: int) -> list[frozenset[int]]:
+def primary_fragments(gra: MolGraph, *, rung: int) -> list[frozenset[int]]:
     """Get the node sets of the primary fragments for a CBH rung.
+
+    A primary fragment whose atoms are contained in another one contributes only terms
+    that cancel in `expansion` (its singleton is annulled by pairing every simplex that
+    contains it with that simplex plus the containing fragment), so only the maximal
+    fragments are kept. In a chain these are the centers at least ``rung // 2`` bonds
+    from a terminus.
 
     Args:
         gra: A molecular graph.
         rung: The CBH rung.
 
     Returns:
-        One node set per primary center (atoms for even rungs, bonds for odd rungs),
-        sorted so that a set's position is its fragment id.
+        One node set per maximal primary center (atoms for even rungs, bonds for odd
+        rungs), sorted so that a set's position is its fragment id.
     """
     radius = rung // 2
     centers = gra.edges if rung % 2 else ((key,) for key in gra.nodes)
-    fragments = (neighborhood(gra, center, radius=radius) for center in centers)
-    return sorted(fragments, key=sorted)
+    fragments = {neighborhood(gra, center, radius=radius) for center in centers}
+    maximal = [
+        frag for frag in fragments if not any(frag < other for other in fragments)
+    ]
+    return sorted(maximal, key=sorted)
 
 
 def _nerve(gra: MolGraph, fragments: list[frozenset[int]]) -> set[frozenset[int]]:
