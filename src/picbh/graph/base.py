@@ -114,7 +114,54 @@ def edge_keys[NodeT: Node, EdgeT: Edge](
     return list(gra.edges())
 
 
+def neighborhood[NodeT: Node, EdgeT: Edge](
+    gra: Graph[NodeT, EdgeT],
+    keys: int | Collection[int],
+    *,
+    radius: int = 1,
+) -> frozenset[int]:
+    """Get the nodes within a given radius of one or more center nodes.
+
+    Args:
+        gra: A graph.
+        keys: One center node, or a collection of them.
+        radius: The maximum number of hops from a center node. ``0`` returns just
+            the center nodes themselves.
+
+    Returns:
+        The center nodes and every node reachable within ``radius`` hops of one.
+    """
+    centers = [keys] if isinstance(keys, int) else keys
+    nodes: set[int] = set()
+    for center in centers:
+        nodes.update(nx.single_source_shortest_path_length(gra, center, cutoff=radius))
+    return frozenset(nodes)
+
+
 # Transformations
+def subgraph[GraphT: Graph](
+    gra: GraphT,
+    keys: Collection[int],
+    *,
+    in_place: bool = False,
+) -> GraphT:
+    """Get the subgraph induced by a set of nodes.
+
+    Args:
+        gra: A graph.
+        keys: The nodes to keep.
+        in_place: Whether to modify the graph in place instead of returning a copy.
+
+    Returns:
+        The induced subgraph.
+    """
+    keys = set(keys)
+    if in_place:
+        gra.remove_nodes_from([key for key in gra if key not in keys])
+        return gra
+    return gra.subgraph(keys).copy()
+
+
 def remove_edges[NodeT: Node, EdgeT: Edge](
     gra: Graph[NodeT, EdgeT],
     edges: Collection[EdgeKey],

@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `cbh` module: `cbh.expansion(gra, *, rung)` returns the connectivity-based hierarchy
+  reaction for a species as a mapping from canonical InChI to signed stoichiometric
+  coefficient. Reproduces Scheme 1 (methionine, rungs 0-4) of the CBH automation paper.
+- `graph.capped_subgraph`, `graph.subgraph`, and `graph.neighborhood`.
 - `Atom.implicit_hydrogens` and `Bond.order` fields, so molecular graphs mirror the
   SMILES/InChI they are read from (stereochemistry, formal charge, and isotopes aside).
 - `graph.smiles` to convert a molecular graph to a SMILES string. The output is not

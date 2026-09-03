@@ -37,6 +37,64 @@ def test__symbols() -> None:
     assert graph.symbols(water) == ["O"]
 
 
+@pytest.mark.parametrize(
+    ("smi", "ref"),
+    [
+        ("C", []),
+        ("CC", [1]),
+        ("C=C", [2]),
+        ("C#C", [3]),
+        ("CC=O", [1, 2]),
+    ],
+)
+def test__bond_orders(smi: str, ref: list[int]) -> None:
+    """Test graph bond orders."""
+    gra = graph.from_smiles(smi)
+    assert graph.bond_orders(gra) == ref
+
+
+def test__bond_orders__keys() -> None:
+    """Bond orders are returned for the requested bonds, in the requested order."""
+    gra = graph.from_smiles("C=CC#N")  # bonds: (0, 1) = 2, (1, 2) = 1, (2, 3) = 3
+    assert graph.bond_orders(gra, [(2, 3), (0, 1)]) == [3, 2]
+
+
+def test__bond_orders__kekulized_aromatic() -> None:
+    """Aromatic bonds are Kekulized to alternating single and double orders."""
+    benzene = graph.from_smiles("c1ccccc1")
+    assert sorted(graph.bond_orders(benzene)) == [1, 1, 1, 2, 2, 2]
+
+
+def test__subgraph() -> None:
+    """The induced subgraph keeps only the given nodes and their mutual bonds."""
+    propane = graph.from_smiles("CCC")
+    ethyl = graph.subgraph(propane, [0, 1])
+    assert graph.is_isomorphic(ethyl, graph.from_smiles("[CH3][CH2]"))
+    assert graph.node_keys(propane) == [0, 1, 2]  # copy left the input untouched
+
+
+def test__subgraph__in_place() -> None:
+    """An in-place subgraph mutates and returns the original graph."""
+    propane = graph.from_smiles("CCC")
+    ethyl = graph.subgraph(propane, [0, 1], in_place=True)
+    assert ethyl is propane
+    assert graph.node_keys(propane) == [0, 1]
+
+
+def test__neighborhood() -> None:
+    """The neighborhood collects nodes within a radius of any center node."""
+    chain = graph.from_smiles("CCCCC")  # 0 - 1 - 2 - 3 - 4
+    assert graph.neighborhood(chain, 2, radius=1) == frozenset({1, 2, 3})
+    assert graph.neighborhood(chain, (0, 4), radius=1) == frozenset({0, 1, 3, 4})
+
+
+def test__capped_subgraph() -> None:
+    """A severed bond is capped with implicit hydrogens equal to its bond order."""
+    propene = graph.from_smiles("C=CC")  # 0 = 1 - 2
+    frag = graph.capped_subgraph(propene, [1, 2])
+    assert graph.inchi(frag) == graph.inchi(graph.from_smiles("CC"))
+
+
 def test__field_enum_matches_fields() -> None:
     """A nested Field enum in parity with the model fields is accepted."""
 

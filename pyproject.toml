@@ -48,6 +48,7 @@ root_package = "picbh"
 name = "Module Layering"
 type = "layers"
 layers = [
+    "picbh.cbh",
     "picbh.graph.mol",
     "picbh.graph.base",
     "picbh.element",

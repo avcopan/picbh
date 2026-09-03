@@ -12,14 +12,14 @@ or 3); RDKit re-perceives aromaticity on output.
 """
 
 import enum
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from rdkit import Chem
 from rdkit.Chem import rdchem
 from rdkit.Chem.rdchem import Mol, RWMol
 
 from ..element import bonding_capacity
-from .base import Edge, Graph, Node, edge_keys, node_keys
+from .base import Edge, Graph, Node, edge_keys, node_keys, subgraph
 
 
 # RDKit helpers (inlined to avoid an extra dependency)
@@ -206,6 +206,31 @@ def unpaired_electrons(gra: MolGraph, keys: Sequence[int] | None = None) -> list
     caps = element_bonding_capacities(gra, keys)
     vals = total_valences(gra, keys)
     return [cap - val for cap, val in zip(caps, vals, strict=True)]
+
+
+# Transformations
+def capped_subgraph(gra: MolGraph, keys: Collection[int]) -> MolGraph:
+    """Get an induced subgraph with every severed bond capped by implicit hydrogens.
+
+    Each bond broken by the cut adds its bond order to the implicit hydrogen count of
+    the atom that remains, so the fragment is a valid closed-shell molecule. This is the
+    capping operation of the connectivity-based hierarchy.
+
+    Args:
+        gra: A molecular graph.
+        keys: The atoms to keep.
+
+    Returns:
+        The capped induced subgraph.
+    """
+    keys = frozenset(keys)
+    sub = subgraph(gra, keys)
+    for key in keys:
+        for nbr in gra[key]:
+            if nbr not in keys:
+                order = gra.edges[key, nbr][Bond.Field.order]
+                sub.nodes[key][Atom.Field.implicit_hydrogens] += order
+    return sub
 
 
 # Conversions from other types
